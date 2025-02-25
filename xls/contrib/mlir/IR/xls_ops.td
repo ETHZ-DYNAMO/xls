@@ -105,7 +105,12 @@ defvar Xls_BitsOrTuple = AnyTypeOf<[Xls_Bits, NestedTupleOf<[Xls_Bits]>]>;
 // Base class for XLS dialect attributes.
 class Xls_Attr<string name, list<Trait> traits = []>
     : AttrDef<Xls_Dialect, name, traits> {
+
+#ifdef DYNAMATIC_ENABLE_XLS
+  let cppClassName = name # "Attr";
+#else
   let cppClassName = name;
+#endif // DYNAMATIC_ENABLE_XLS
   let mnemonic = ?;
 }
 
@@ -132,7 +137,10 @@ def Xls_TranslationLinkage : Xls_Attr<"TranslationLinkage"> {
     DefaultValuedParameter<"mlir::xls::LinkageKind", "LinkageKind::kImport">:$kind);
   let mnemonic = "translation_linkage";
   let assemblyFormat = "`<` $package `:` $function (`,` $kind^)? `>`";
+#ifndef DYNAMATIC_ENABLE_XLS
+  // API name changed in LLVM
   let attrName = "xls.translation_linkage";
+#endif // DYNAMATIC_ENABLE_XLS
 }
 
 def Xls_FlopKindNone        : I32EnumAttrCase<"kNone", 0, "none"> {
@@ -451,8 +459,12 @@ class Xls_PartialProdOp<string name, string desc> :  Xls_Op<name, [
   Pure,
   ShapesAreConsistent<["lhs", "rhs", "result_lhs", "result_rhs"]>,
   Elementwise,
-  Scalarizable,
-  AllTypesMatch<["result_lhs", "result_rhs"]>
+  Scalarizable
+#ifndef DYNAMATIC_ENABLE_XLS
+  // This is broken because my upstream bugfix in LLVM d oes not
+  // exist in dynamatic :(
+  , AllTypesMatch<["result_lhs", "result_rhs"]>
+#endif // DYNAMATIC_ENABLE_XLS
 ]> {
   let summary = !strconcat(desc, " operation");
   let description = summary;

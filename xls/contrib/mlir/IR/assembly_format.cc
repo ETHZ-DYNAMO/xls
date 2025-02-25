@@ -18,7 +18,12 @@
 #include <string>
 
 #include "llvm/include/llvm/ADT/STLExtras.h"
+#ifdef DYNAMATIC_ENABLE_XLS
+// Header name changed in LLVM
+#include "mlir/include/mlir/Support/LogicalResult.h"
+#else
 #include "llvm/include/llvm/Support/LogicalResult.h"
+#endif // DYNAMATIC_ENABLE_XLS
 #include "llvm/include/llvm/Support/SMLoc.h"
 #include "mlir/include/mlir/IR/Attributes.h"
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"

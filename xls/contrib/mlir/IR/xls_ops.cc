@@ -25,7 +25,12 @@
 #include "llvm/include/llvm/ADT/STLExtras.h"
 #include "llvm/include/llvm/ADT/TypeSwitch.h"  // IWYU pragma: keep
 #include "llvm/include/llvm/Support/ErrorHandling.h"
+#ifdef DYNAMATIC_ENABLE_XLS
+// Header name changed in LLVM
+#include "mlir/include/mlir/Support/LogicalResult.h"
+#else
 #include "llvm/include/llvm/Support/LogicalResult.h"
+#endif  // DYNAMATIC_ENABLE_XLS
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/include/mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/include/mlir/IR/Attributes.h"
@@ -105,7 +110,13 @@ ShapeOrBad getShapeSplat(Operation::operand_type_range range) {
     auto result = getShapeSplat(type);
     if (!shapeSplat.has_value()) {
       shapeSplat = result;
-    } else if (result != *shapeSplat) {
+    }
+#ifdef DYNAMATIC_ENABLE_XLS
+    // Auto-creation of != from == doesn't exist until C++20
+    else if (!(result == *shapeSplat)) {
+#else
+    else if (result != *shapeSplat) {
+#endif // DYNAMATIC_ENABLE_XLS
       return ShapeOrBad::getBad();
     }
   }
@@ -223,7 +234,11 @@ void CountedForOp::setCalleeFromCallable(CallInterfaceCallable callee) {
 // Verify that the xls.linkage attribute for importing Verilog is valid
 // and the Verilog import function arguments and results have names.
 LogicalResult verifyImportedVerilogFunction(func::FuncOp func,
+#ifdef DYNAMATIC_ENABLE_XLS
+                                            TranslationLinkageAttr linkage) {
+#else
                                             TranslationLinkage linkage) {
+#endif
   // The Verilog import function has to have a foreign linkage attribute.
   if (linkage.getKind() != LinkageKind::kForeign) {
     return func->emitError()
@@ -261,7 +276,11 @@ LogicalResult ImportVerilogFileOp::verifySymbolUses(
     if (!func) {
       continue;
     }
+#ifdef DYNAMATIC_ENABLE_XLS
+    auto linkage = func->getAttrOfType<TranslationLinkageAttr>("xls.linkage");
+#else
     auto linkage = func->getAttrOfType<TranslationLinkage>("xls.linkage");
+#endif
     if (!linkage) {
       continue;
     }
@@ -281,10 +300,16 @@ LogicalResult CountedForOp::verifySymbolUses(
     return emitError("'") << getToApply()
                           << "' does not reference a valid function";
   }
-
+#ifdef DYNAMATIC_ENABLE_XLS
+  // Auto-creation of != from == doesn't exist until C++20
+  if (!(funcOp.getFunctionType().getInputs().drop_front() == getOperandTypes())) {
+    return emitOpError("input argument mismatch between op and for body");
+  }
+#else
   if (funcOp.getFunctionType().getInputs().drop_front() != getOperandTypes()) {
     return emitOpError("input argument mismatch between op and for body");
   }
+#endif // DYNAMATIC_ENABLE_XLS
   if (funcOp.getFunctionType().getResults().front() != getType()) {
     return emitOpError("result mismatch between op and for body");
   }
@@ -413,7 +438,12 @@ LogicalResult TupleIndexOp::canonicalize(TupleIndexOp op,
                                          PatternRewriter& rewriter) {
   // tuple_index(tuple($x1, $x2, ...), index=N) = $xN
   if (auto defining_op = op.getOperand().getDefiningOp<TupleOp>()) {
+#ifdef DYNAMATIC_ENABLE_XLS
+    // API change in LLVM
+    rewriter.replaceAllUsesWith(op, defining_op->getOperand(op.getIndex()));
+#else
     rewriter.replaceAllOpUsesWith(op, defining_op->getOperand(op.getIndex()));
+#endif  // DYNAMATIC_ENABLE_XLS
     return success();
   }
   return failure();
@@ -902,7 +932,12 @@ struct EprocOpSignatureConversion : public ConversionPattern {
 
     // Perform a no-op modification to inform the rewriter that we did actually
     // modify the op successfully (convertRegionTypes modifies the region).
+#ifdef DYNAMATIC_ENABLE_XLS
+    // API change in LLVM
+    rewriter.updateRootInPlace(op, [&] {});
+#else
     rewriter.modifyOpInPlace(op, [&] {});
+#endif  // DYNAMATIC_ENABLE_XLS
     return success();
   }
 
